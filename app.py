@@ -10,12 +10,21 @@ import folium
 from geopy.distance import geodesic
 from shapely.geometry import Point
 from opencage.geocoder import OpenCageGeocode
+import os
+
+# Assuming you have set the API_KEY in your environment or GitHub Actions
+api_key = os.getenv('API_KEY')
+
+if api_key is None:
+    raise ValueError("API key is not set")
+else:
+    print("API Key retrieved successfully!")
 
 # Initialize the geocoder
 geolocator = Nominatim(user_agent="my_geocoder")
 api_url = 'https://maps.victoria.ca/server/rest/services/OpenData/OpenData_Parks/MapServer/50/query?outFields=*&where=1%3D1&f=geojson'
 
-geolocator = OpenCageGeocode('b0825d9ccebc4922bd24022e2784391b')
+geolocator = OpenCageGeocode(api_key)
 
 def geocode_postal_code(postal_code):
     try:
