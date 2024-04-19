@@ -1,3 +1,4 @@
 geopy
 geopandas
 streamlit-folium
+opencage
