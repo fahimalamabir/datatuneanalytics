@@ -1,5 +1,11 @@
-geopy
+folium
 geopandas
+geopy
+numpy
+pandas
 streamlit-folium
+urllib3
+python-doenv
 opencage
-python-dotenv
+openrouteservice
+osmnx
