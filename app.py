@@ -37,10 +37,16 @@ parks_data = fetch_park_data(api_url)
 # Function to geocode a postal code
 def geocode_postal_code(postal_code):
     try:
-        location = geolocator.geocode(postal_code)
-        return (location.latitude, location.longitude)
-    except:
+        location = geolocator.geocode(f"{postal_code}, Victoria, BC")  # Specify more context
+        if location:
+            return (location.latitude, location.longitude)
+        else:
+            st.error("No location found for this postal code. Please check the format or try a nearby postal code.")
+            return None, None
+    except Exception as e:
+        st.error(f"An error occurred during geocoding: {str(e)}")
         return None, None
+
 
 # Function to calculate distances and return the closest park
 def find_nearest_park(user_location, parks_data):
