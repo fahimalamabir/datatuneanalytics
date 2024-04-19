@@ -14,6 +14,22 @@ from shapely.geometry import Point
 # Initialize the geocoder
 geolocator = Nominatim(user_agent="my_geocoder")
 api_url = 'https://maps.victoria.ca/server/rest/services/OpenData/OpenData_Parks/MapServer/50/query?outFields=*&where=1%3D1&f=geojson'
+
+geolocator = OpenCageGeocode('b0825d9ccebc4922bd24022e2784391b')
+
+def geocode_postal_code(postal_code):
+    try:
+        query = f"{postal_code}, Victoria, BC"
+        results = geolocator.geocode(query)
+        if results:
+            location = results[0]  # Taking the first result
+            return (location['geometry']['lat'], location['geometry']['lng'])
+        else:
+            st.error("No location found for this postal code. Please check the format or try a nearby postal code.")
+            return None, None
+    except Exception as e:
+        st.error(f"An error occurred during geocoding: {str(e)}")
+        return None, None
 # Function to fetch real-time park data from Open Data Victoria's RESTful API
 def fetch_park_data(url):
     response = requests.get(url)
@@ -33,19 +49,6 @@ def fetch_park_data(url):
 
 parks_data = fetch_park_data(api_url)
 
-
-# Function to geocode a postal code
-def geocode_postal_code(postal_code):
-    try:
-        location = geolocator.geocode(f"{postal_code}, Victoria, BC")  # Specify more context
-        if location:
-            return (location.latitude, location.longitude)
-        else:
-            st.error("No location found for this postal code. Please check the format or try a nearby postal code.")
-            return None, None
-    except Exception as e:
-        st.error(f"An error occurred during geocoding: {str(e)}")
-        return None, None
 
 
 # Function to calculate distances and return the closest park
