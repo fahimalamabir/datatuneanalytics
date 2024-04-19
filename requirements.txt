@@ -4,7 +4,6 @@ geopy
 numpy
 pandas
 streamlit-folium
-urllib3
 python-doenv
 opencage
 openrouteservice
