@@ -1,10 +1,6 @@
+streamlit
 folium
 geopandas
-geopy
-numpy
-pandas
-streamlit-folium
-python-doenv
-opencage
-openrouteservice
 osmnx
+openrouteservice
+python-dotenv
