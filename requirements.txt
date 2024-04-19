@@ -5,3 +5,4 @@ osmnx
 streamlit_folium
 openrouteservice
 python-dotenv
+geopy
