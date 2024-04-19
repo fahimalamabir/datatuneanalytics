@@ -9,7 +9,7 @@ from streamlit_folium import folium_static
 import folium
 from geopy.distance import geodesic
 from shapely.geometry import Point
-
+from opencage.geocoder import OpenCageGeocode
 
 # Initialize the geocoder
 geolocator = Nominatim(user_agent="my_geocoder")
