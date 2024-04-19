@@ -2,3 +2,4 @@ geopy
 geopandas
 streamlit-folium
 opencage
+python-dotenv
