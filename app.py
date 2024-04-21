@@ -214,6 +214,9 @@ elif selected_tab == 'Find Nearest Park':
                         route, duration = get_route(user_location, park_location, profile)
                         if route:
                             # Map and route display
+                            st.write(f"The nearest park is: {nearest_park['Park_Name']}")
+                            st.write(f"Distance: {nearest_park['distance']:.2f} meters")
+                            st.write(f"Estimated travel time by {mode}: {duration:.1f} minutes")
                             m = folium.Map(location=[user_lat, user_lon], zoom_start=12)
                             folium.Marker([user_lat, user_lon], tooltip='Your Location', icon=folium.Icon(color='red')).add_to(m)
                             folium.Marker(
@@ -289,10 +292,34 @@ elif selected_tab == 'Amenities Analysis':
     fig_sunburst = px.sunburst(
         sunburst_data,
         path=['ParkClassCode', 'Park_Name', 'Amenity'],
-        title="Distribution of Amenities by Park and Class"
+        title="Distribution of Amenities by Park and Class (click on segments for details)"
     )
-    # Update the layout to increase the plot size
-    fig_sunburst.update_layout(height=1200)  # Set the height of the plot
 
-    # Display the plot in Streamlit
+    # Update layout settings to adjust margins and title position
+    fig_sunburst.update_layout(
+        height=1000,
+        title=dict(
+            text="Distribution of Amenities by Park and Class (click on segments for details)",
+            y=0.9,  # Adjust the y-position of the title
+            x=0.5,  # Center the title
+            xanchor='center',
+            yanchor='top'
+        )
+    )
     st.plotly_chart(fig_sunburst, use_container_width=True)
+
+    fig_sunburst.add_annotation(
+        text="Click on a segment to explore!",
+        xref="paper", yref="paper",
+        x=0.5, y=1.2,  # Adjust these coordinates to position the annotation
+        showarrow=False,
+        font=dict(size=16, color="red"),
+        align="center"
+    )
+
+    # Adjust plot layout after adding annotations
+    fig_sunburst.update_layout(
+        height=1000,
+        margin=dict(t=100, l=0, r=0, b=0)  # Increase the top margin if necessary
+    )
+
