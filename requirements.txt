@@ -8,3 +8,5 @@ python-dotenv
 geopy
 opencage
 matplotlib
+seaborn
+plotly
