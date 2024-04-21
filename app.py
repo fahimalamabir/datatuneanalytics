@@ -4,6 +4,7 @@ import requests
 import folium
 from streamlit_folium import folium_static
 import pandas as pd
+import matplotlib.pyplot as plt
 from geopy.geocoders import Nominatim
 import geopandas as gpd
 from shapely.geometry import Point
@@ -13,11 +14,16 @@ import os
 import openrouteservice
 from openrouteservice import convert
 from dotenv import load_dotenv
+import seaborn as sns
+import plotly.graph_objects as go
+import plotly.express as px
+
 load_dotenv()
 
 st.title('Victoria Parks and Routes Explorer')
-tab1, tab2 = st.tabs(["Parks Overview", "Find Nearest Park"])
-
+with st.sidebar:
+    st.header('Navigation')
+    selected_tab = st.radio('Select a view:', ['Parks Overview', 'Find Nearest Park', 'Park Size Distribution','Amenities Analysis'])
 
 # Initialize the geocoder with Nominatim and OpenCage
 geolocator = Nominatim(user_agent="my_geocoder")
@@ -78,8 +84,70 @@ def geocode_postal_code(postal_code):
     except Exception as e:
         st.error(f"An error occurred during geocoding: {str(e)}")
         return None, None
+    
+    # Function to find the nearest park
+def find_nearest_park(user_location, parks_data):
+    try:
+        user_point = Point(user_location[1], user_location[0])  # Point expects (x, y)
+        parks_data['distance'] = parks_data.apply(
+            lambda row: geodesic(
+                (row.geometry.centroid.y, row.geometry.centroid.x),
+                (user_point.y, user_point.x)
+            ).meters, axis=1
+        )
+        nearest_park = parks_data.loc[parks_data['distance'].idxmin()]
+        return nearest_park, parks_data
+    except Exception as e:
+        st.error(f"Error calculating distances: {str(e)}")
+        return None, None
+    
+def amenities_analysis(parks_data):
+    amenities_cols = ['BallDiamon', 'Concession', 'DogsOffLea', 'Horticultu',
+                      'LawnBowlin', 'PicnicShel', 'PlayEquipm', 'SportField',
+                      'TennisCour', 'Trail', 'Washroom', 'WaterView']
+    
+    # Create a count dictionary for each amenity
+    amenities_count = {amenity: parks_data[amenity].value_counts().get('Yes', 0) for amenity in amenities_cols}
 
-with tab1:
+    # Convert to DataFrame for visualization
+    amenities_df = pd.DataFrame(list(amenities_count.items()), columns=['Amenity', 'Count']).sort_values('Count', ascending=False)
+    
+    # Plotting
+    plt.figure(figsize=(10, 6))
+    sns.barplot(data=amenities_df, x='Count', y='Amenity', palette='viridian')
+    plt.title('Count of Amenities in Parks')
+    plt.xlabel('Count')
+    plt.ylabel('Amenity')
+    plt.tight_layout()
+
+    return plt
+
+# Function to integrate the amenities analysis into the Streamlit app
+amenities_cols = [
+    'BallDiamond', 'Concession', 'DogsOffLeash', 'HorticulturalInterest',
+    'LawnBowling', 'PicnicShelter', 'PlayEquipment', 'SportField',
+    'TennisCourt', 'Trail', 'Washroom', 'WaterView'
+]
+
+def amenities_analysis(parks_data):
+    # Create a count dictionary for each amenity
+    amenities_count = {amenity: parks_data[amenity].value_counts().get('Yes', 0) for amenity in amenities_cols}
+
+    # Convert to DataFrame for visualization
+    amenities_df = pd.DataFrame(list(amenities_count.items()), columns=['Amenity', 'Count']).sort_values('Count', ascending=False)
+    
+    # Plotting
+    plt.figure(figsize=(10, 6))
+    sns.barplot(data=amenities_df, x='Count', y='Amenity', palette='viridis')
+    plt.title('Count of Amenities in Parks')
+    plt.xlabel('Count')
+    plt.ylabel('Amenity')
+    plt.tight_layout()
+    
+
+    return plt
+
+if selected_tab == 'Parks Overview':
     st.header("Parks and Open Spaces Overview")
     shapefile_path = 'Parks_and_Open_Spaces.shp'
     parks_data1 = gpd.read_file(shapefile_path)
@@ -124,23 +192,7 @@ with tab1:
 
     folium_static(parks_map)
 
-
-# Function to find the nearest park
-def find_nearest_park(user_location, parks_data):
-    try:
-        user_point = Point(user_location[1], user_location[0])  # Point expects (x, y)
-        parks_data['distance'] = parks_data.apply(
-            lambda row: geodesic(
-                (row.geometry.centroid.y, row.geometry.centroid.x),
-                (user_point.y, user_point.x)
-            ).meters, axis=1
-        )
-        nearest_park = parks_data.loc[parks_data['distance'].idxmin()]
-        return nearest_park, parks_data
-    except Exception as e:
-        st.error(f"Error calculating distances: {str(e)}")
-        return None, None
-with tab2:
+elif selected_tab == 'Find Nearest Park':
     postal_code = st.text_input('Enter your postal code')
     mode = st.radio("Choose your mode of transportation:", ('Driving', 'Walking'))
     if mode == 'Driving':
@@ -187,3 +239,60 @@ with tab2:
                 st.error("Invalid coordinates received from geocoding.")
         else:
             st.error("Could not geocode the postal code.")
+elif selected_tab == 'Park Size Distribution':
+    st.header("Park Size Distribution Analysis")
+    if 'SHAPE_Area' in parks_data.columns:
+        # For the histogram
+        st.write("### Histogram of Park Sizes")
+        fig_hist, ax_hist = plt.subplots()
+        parks_data['SHAPE_Area'].plot(kind='hist', bins=30, ax=ax_hist, color='skyblue')
+        ax_hist.set_title('Distribution of Park Sizes')
+        ax_hist.set_xlabel('Area (square units)')
+        ax_hist.set_ylabel('Frequency')
+        st.pyplot(fig_hist)
+
+        # Text below histogram
+        st.write("""
+        There's a large spike in the first bin, indicating that a majority of the parks are small in size. 
+        The distribution is heavily right-skewed, meaning there are fewer large parks.
+        """)
+
+        # For the boxplot
+        st.write("### Boxplot of Park Sizes")
+        fig_box, ax_box = plt.subplots()
+        parks_data['SHAPE_Area'].plot(kind='box', ax=ax_box, vert=False, color='green')
+        ax_box.set_title('Boxplot of Park Sizes')
+        ax_box.set_xlabel('Area (square units)')
+        st.pyplot(fig_box)
+
+        # Text below boxplot
+        st.write("""
+        The boxplot shows that the median park size is quite low compared to the mean, and there are a few parks 
+        that are significantly larger than the rest, as indicated by the points far to the right (outliers).
+        """)
+
+    else:
+        st.error("SHAPE_Area column is missing from the data")
+
+elif selected_tab == 'Amenities Analysis':
+    # Call the amenities analysis function and store the returned figure
+    fig = amenities_analysis(parks_data)
+    st.pyplot(fig)
+
+    for col in parks_data.columns[2:]:
+        parks_data[col] = parks_data[col].apply(lambda x: 1 if x == 'Yes' else 0)
+
+    # Prepare data for Sunburst Chart
+    sunburst_data = parks_data.melt(id_vars=['Park_Name', 'ParkClassCode'], var_name='Amenity', value_name='Available')
+    sunburst_data = sunburst_data[sunburst_data['Available'] == 1]
+
+    fig_sunburst = px.sunburst(
+        sunburst_data,
+        path=['ParkClassCode', 'Park_Name', 'Amenity'],
+        title="Distribution of Amenities by Park and Class"
+    )
+    # Update the layout to increase the plot size
+    fig_sunburst.update_layout(height=1200)  # Set the height of the plot
+
+    # Display the plot in Streamlit
+    st.plotly_chart(fig_sunburst, use_container_width=True)
