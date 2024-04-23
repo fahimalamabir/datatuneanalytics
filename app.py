@@ -52,7 +52,6 @@ parks_data = fetch_park_data(api_url)
 
 
 
-
 def get_route(start_coords, end_coords, profile='foot-walking'):
     client = openrouteservice.Client(key=os.getenv("ORS_API_KEY"))
     try:
@@ -84,34 +83,27 @@ def geocode_postal_code(postal_code):
     except Exception as e:
         st.error(f"An error occurred during geocoding: {str(e)}")
         return None, None
-    
+
     # Function to find the nearest park
-def find_nearest_park(user_location, parks_data):
-    try:
-        user_point = Point(user_location[1], user_location[0])  # Point expects (x, y)
-        parks_data['distance'] = parks_data.apply(
-            lambda row: geodesic(
-                (row.geometry.centroid.y, row.geometry.centroid.x),
-                (user_point.y, user_point.x)
-            ).meters, axis=1
-        )
-        nearest_park = parks_data.loc[parks_data['distance'].idxmin()]
-        return nearest_park, parks_data
-    except Exception as e:
-        st.error(f"Error calculating distances: {str(e)}")
-        return None, None
-    
+
+
+def find_nearest_park(user_location, parks_data, number_of_parks=3):
+    # Calculate distance for each park
+    parks_data['distance'] = parks_data.apply(lambda row: geodesic((row.geometry.centroid.y, row.geometry.centroid.x), user_location).meters, axis=1)
+    # Sort by distance and return the top N parks
+    return parks_data.nsmallest(number_of_parks, 'distance')
+
 def amenities_analysis(parks_data):
     amenities_cols = ['BallDiamon', 'Concession', 'DogsOffLea', 'Horticultu',
                       'LawnBowlin', 'PicnicShel', 'PlayEquipm', 'SportField',
                       'TennisCour', 'Trail', 'Washroom', 'WaterView']
-    
+
     # Create a count dictionary for each amenity
     amenities_count = {amenity: parks_data[amenity].value_counts().get('Yes', 0) for amenity in amenities_cols}
 
     # Convert to DataFrame for visualization
     amenities_df = pd.DataFrame(list(amenities_count.items()), columns=['Amenity', 'Count']).sort_values('Count', ascending=False)
-    
+
     # Plotting
     plt.figure(figsize=(10, 6))
     sns.barplot(data=amenities_df, x='Count', y='Amenity', palette='viridian')
@@ -135,7 +127,7 @@ def amenities_analysis(parks_data):
 
     # Convert to DataFrame for visualization
     amenities_df = pd.DataFrame(list(amenities_count.items()), columns=['Amenity', 'Count']).sort_values('Count', ascending=False)
-    
+
     # Plotting
     plt.figure(figsize=(10, 6))
     sns.barplot(data=amenities_df, x='Count', y='Amenity', palette='viridis')
@@ -143,7 +135,7 @@ def amenities_analysis(parks_data):
     plt.xlabel('Count')
     plt.ylabel('Amenity')
     plt.tight_layout()
-    
+
 
     return plt
 
@@ -154,7 +146,7 @@ if selected_tab == 'Parks Overview':
 
     parks_data1 = parks_data1.to_crs(epsg=4326)
     parks_map = folium.Map(location=[48.4284, -123.3656], zoom_start=13)
-    
+
     for _, row in parks_data1.iterrows():
         # Simplify geometry to make the map load faster, if necessary
         simplified_geom = row['geometry'].simplify(tolerance=0.001, preserve_topology=True)
@@ -199,8 +191,7 @@ elif selected_tab == 'Find Nearest Park':
         profile = 'driving-car'
     else:
         profile = 'foot-walking'
-        
-    if st.button('Find Nearest Park'):
+    if st.button('Find Nearest Parks'):
         geocode_result = geocode_postal_code(postal_code)
         if geocode_result:
             user_lat, user_lon = geocode_result
@@ -208,40 +199,42 @@ elif selected_tab == 'Find Nearest Park':
                 user_location = (user_lat, user_lon)
                 parks_data = fetch_park_data(api_url)
                 if not parks_data.empty:
-                    nearest_park, all_parks_with_distances = find_nearest_park(user_location, parks_data)
-                    if nearest_park is not None:
-                        park_location = (nearest_park.geometry.centroid.y, nearest_park.geometry.centroid.x)
-                        route, duration = get_route(user_location, park_location, profile)
-                        if route:
-                            # Map and route display
-                            st.write(f"The nearest park is: {nearest_park['Park_Name']}")
-                            st.write(f"Distance: {nearest_park['distance']:.2f} meters")
-                            st.write(f"Estimated travel time by {mode}: {duration:.1f} minutes")
-                            m = folium.Map(location=[user_lat, user_lon], zoom_start=12)
-                            folium.Marker([user_lat, user_lon], tooltip='Your Location', icon=folium.Icon(color='red')).add_to(m)
-                            folium.Marker(
-                                [park_location[0], park_location[1]],
-                                tooltip=f"{nearest_park['Park_Name']}",
-                                icon=folium.Icon(color='green')
-                            ).add_to(m)
-                            folium.GeoJson(route, name='Route').add_to(m)
-                            folium.LayerControl().add_to(m)
-                            folium_static(m)
+                    nearest_parks = find_nearest_park(user_location, parks_data, number_of_parks=3)
+                    if not nearest_parks.empty:
+                        # Define colors for the routes
+                        colors = ['blue', 'green', 'red']
+                        m = folium.Map(location=[user_lat, user_lon], zoom_start=12)
+                        # Marker for user's location
+                        folium.Marker([user_lat, user_lon], tooltip='Your Location',
+                                      icon=folium.Icon(color='black')).add_to(m)
 
-                            # Display park and route information
-                            st.write(f"The nearest park is: {nearest_park['Park_Name']}")
-                            st.write(f"Distance: {nearest_park['distance']:.2f} meters")
-                            st.write(f"Estimated travel time by {mode}: {duration:.1f} minutes")
-                        else:
-                            st.error("Could not retrieve route.")
+                        for (park, color) in zip(nearest_parks.itertuples(), colors):
+                            park_location = (park.geometry.centroid.y, park.geometry.centroid.x)
+                            route, duration = get_route(user_location, park_location, profile)
+                            if route:
+                                # Marker for park's location with corresponding route color
+                                folium.Marker(
+                                    [park_location[0], park_location[1]],
+                                    tooltip=f"{park.Park_Name}",
+                                    icon=folium.Icon(color=color)  # Match marker color with route color
+                                ).add_to(m)
+                                folium.GeoJson(route, name=f'Route to {park.Park_Name}',
+                                               style_function=lambda x, color=color: {'color': color}).add_to(m)
+                                st.write(
+                                    f"{park.Park_Name} - {park.distance:.2f} meters away, Estimated travel time by {mode}: {duration:.1f} minutes")
+                        folium.LayerControl().add_to(m)
+                        folium_static(m)
                     else:
-                        st.error("Could not retrieve or parse park data.")
+                        st.error("Could not find any nearby parks.")
                 else:
                     st.error("Park data is empty.")
             else:
                 st.error("Invalid coordinates received from geocoding.")
         else:
             st.error("Could not geocode the postal code.")
+
+
+
 elif selected_tab == 'Park Size Distribution':
     st.header("Park Size Distribution Analysis")
     if 'SHAPE_Area' in parks_data.columns:
